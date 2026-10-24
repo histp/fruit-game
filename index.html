@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>사과 받기 게임</title>
+<style>
+:root{font-family:system-ui,'Apple SD Gothic Neo',sans-serif;color:#28352b}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#e9f4e6;display:grid;place-items:center;padding:16px}.wrap{width:min(100%,520px)}header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}.badge{background:white;border-radius:16px;padding:10px 14px;font-weight:800;box-shadow:0 3px 10px #0001}#hearts{color:#f04c64;letter-spacing:3px}#game{width:100%;height:620px;max-height:70vh;min-height:390px;background:linear-gradient(#bde8fa 0%,#e6f8fa 74%,#9bd17d 74%,#79bc65 100%);border:5px solid #fff;border-radius:24px;position:relative;overflow:hidden;box-shadow:0 12px 32px #355b3440;touch-action:none}.object{position:absolute;transform:translate(-50%,-50%);pointer-events:none;user-select:none}.apple{width:42px;height:42px;background:#f0453c;border-radius:46% 48% 46% 48%;box-shadow:inset -7px -6px #cc2e2c, inset 5px 4px #ff7b67}.apple:before{content:'';position:absolute;top:-9px;left:20px;width:5px;height:12px;background:#754d29;border-radius:3px;transform:rotate(18deg)}.apple:after{content:'';position:absolute;top:-8px;left:23px;width:15px;height:9px;background:#38995b;border-radius:100% 0 100% 0;transform:rotate(-25deg)}.bomb{width:45px;height:45px;background:#30343b;border-radius:50%;box-shadow:inset -8px -7px #16191e, inset 5px 5px #676d76}.bomb:before{content:'✦';position:absolute;top:-17px;left:17px;color:#f39a28;font-size:24px}.bomb:after{content:'';position:absolute;top:12px;left:11px;width:10px;height:10px;background:#9299a2;border-radius:50%}.bomb img,.player img{width:100%;height:100%;object-fit:contain;display:block}.bomb.has-image{background:none;box-shadow:none}.bomb.has-image:before,.bomb.has-image:after{display:none}.player{width:74px;height:88px;display:grid;place-items:center;font-size:58px;line-height:1}.player.has-image{font-size:0}.controls{display:flex;justify-content:center;gap:20px;margin-top:14px}.controls button{font-size:30px;width:112px;height:64px;touch-action:none}.btn,button,select{font:inherit}.btn,button{border:0;border-radius:15px;background:#337f5a;color:white;padding:12px 18px;font-weight:800;cursor:pointer}.btn:hover,button:hover{filter:brightness(1.08)}button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:#e4eee7;color:#28543a}.overlay{position:absolute;inset:0;background:#142d28aa;display:flex;justify-content:center;align-items:center;padding:22px;z-index:10}.overlay.hidden{display:none}.panel{width:min(100%,370px);background:white;border-radius:24px;padding:28px 22px;text-align:center;box-shadow:0 10px 35px #0003}.panel h1{font-size:27px;margin:0 0 10px}.panel p{line-height:1.55}.actions{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-top:18px}select{padding:10px;border:2px solid #d1e7d8;border-radius:10px;background:white;width:100%;margin-top:8px}.hint{text-align:center;font-size:13px;color:#55715d;margin:10px 0}#endScreen{display:none;text-align:center;padding:24px;background:white;border-radius:24px}#endScreen.show{display:block}.game-hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap"><header><div class="badge" id="levelText">레벨 1 / 15</div><div class="badge" id="scoreText">🍎 0 / 15</div><div class="badge" id="hearts" aria-label="남은 하트 3개">♥ ♥ ♥</div></header>
+<div id="game"><div id="player" class="object player">🧺</div><div id="overlay" class="overlay"><div class="panel"><h1 id="modalTitle">🍎 사과 받기</h1><p id="modalDescription">방향키 ← → 로 움직이세요.<br>사과 15개를 모으면 레벨을 통과합니다.<br>폭탄을 맞으면 하트가 하나 줄어듭니다.</p><div id="levelPicker" style="display:none"><label for="levelSelect">이동할 레벨 선택</label><select id="levelSelect"></select></div><div id="modalActions" class="actions"><button id="startButton">게임 시작</button></div></div></div></div>
+<div id="controls" class="controls"><button id="leftButton" aria-label="왼쪽 이동">◀</button><button id="rightButton" aria-label="오른쪽 이동">▶</button></div><p class="hint">키보드 ← → 또는 아래 버튼을 길게 눌러 이동하세요.</p><div id="endScreen"><h1>게임을 종료했습니다.</h1><p>브라우저에서 직접 연 탭은 보안상 자동으로 닫히지 않을 수 있습니다.</p><button onclick="location.reload()">처음으로</button></div></div>
+<script>
+(()=>{
+'use strict';
+const MAX_LEVEL=15, TARGET=15;
+// 원하는 이미지를 images 폴더에 넣으세요. PNG 투명 배경을 권장합니다.
+const PLAYER_IMAGE='images/player.png';
+const BOMB_IMAGE='images/bomb.png';
+const game=document.querySelector('#game'),player=document.querySelector('#player'),overlay=document.querySelector('#overlay');
+const title=document.querySelector('#modalTitle'),desc=document.querySelector('#modalDescription'),actions=document.querySelector('#modalActions'),picker=document.querySelector('#levelPicker'),select=document.querySelector('#levelSelect');
+const scoreText=document.querySelector('#scoreText'),levelText=document.querySelector('#levelText'),heartsText=document.querySelector('#hearts');
+let level=1,apples=0,hearts=3,items=[],running=false,last=0,spawnClock=0,playerX=0,keys={left:false,right:false},raf=0,runId=0;
+const rand=(a,b)=>a+Math.random()*(b-a);
+function loadImage(url,element,cssClass){const img=new Image();img.onload=()=>{element.textContent='';element.appendChild(img);element.classList.add(cssClass)};img.src=url;}
+loadImage(PLAYER_IMAGE,player,'has-image');
+function bounds(){return {w:game.clientWidth,h:game.clientHeight}}
+function updateHud(){levelText.textContent=`레벨 ${level} / ${MAX_LEVEL}`;scoreText.textContent=`🍎 ${apples} / ${TARGET}`;heartsText.textContent='♥ '.repeat(hearts)+'♡ '.repeat(3-hearts);heartsText.setAttribute('aria-label',`남은 하트 ${hearts}개`)}
+function positionPlayer(){const {w,h}=bounds();playerX=Math.max(38,Math.min(w-38,playerX));player.style.left=playerX+'px';player.style.top=(h-64)+'px'}
+function clearItems(){items.forEach(x=>x.el.remove());items=[]}
+function stop(){running=false;cancelAnimationFrame(raf);runId++;keys.left=keys.right=false}
+function showModal(heading,message,buttons,showPicker=false){title.textContent=heading;desc.innerHTML=message;picker.style.display=showPicker?'block':'none';actions.replaceChildren();buttons.forEach(({text,fn,secondary})=>{let b=document.createElement('button');b.textContent=text;if(secondary)b.className='secondary';b.onclick=fn;actions.appendChild(b)});overlay.classList.remove('hidden')}
+function begin(lvl){stop();clearItems();level=lvl;apples=0;hearts=3;spawnClock=0;last=0;playerX=bounds().w/2;positionPlayer();updateHud();overlay.classList.add('hidden');running=true;const id=runId;raf=requestAnimationFrame(t=>tick(t,id))}
+function restart(){begin(1)}
+function quit(){stop();clearItems();overlay.classList.add('hidden');game.classList.add('game-hidden');document.querySelector('#controls').style.display='none';document.querySelector('#endScreen').classList.add('show');window.close()}
+function spawn(){const {w}=bounds();const isBomb=Math.random()<Math.min(.13+(level-1)*.035,.62);let el=document.createElement('div');el.className='object '+(isBomb?'bomb':'apple');if(isBomb)loadImage(BOMB_IMAGE,el,'has-image');game.insertBefore(el,overlay);const radius=isBomb?23:21;const x=rand(radius+5,Math.max(radius+6,w-radius-5));let item={el,x,y:-35,radius,bomb:isBomb,speed:(135+(level-1)*24)*rand(.85,1.17)};items.push(item);renderItem(item)}
+function renderItem(item){item.el.style.left=item.x+'px';item.el.style.top=item.y+'px'}
+function hit(item){const {h}=bounds();const centerY=h-64;return Math.abs(item.x-playerX)<(item.radius+26)&&Math.abs(item.y-centerY)<(item.radius+33)}
+function tick(time,id){if(!running||id!==runId)return;if(!last)last=time;let dt=Math.min((time-last)/1000,.05);last=time;const {w,h}=bounds();if(keys.left)playerX-=300*dt;if(keys.right)playerX+=300*dt;positionPlayer();spawnClock+=dt*1000;const interval=Math.max(310,960-(level-1)*43);while(spawnClock>=interval){spawnClock-=interval;spawn()}
+for(let i=items.length-1;i>=0;i--){let it=items[i];it.y+=it.speed*dt;renderItem(it);if(hit(it)){it.el.remove();items.splice(i,1);if(it.bomb){hearts--;updateHud();if(hearts<=0){stop();showModal('💔 게임 오버',`레벨 ${level}에서 사과 ${apples}개를 모았습니다.`,[{text:'다시 하기',fn:restart},{text:'그만하기',fn:quit,secondary:true}]);return}}else{apples++;updateHud();if(apples>=TARGET){stop();if(level===MAX_LEVEL){showModal('🏆 모든 레벨 완료!', '15레벨을 모두 통과하셨습니다!',[{text:'처음부터 다시',fn:restart},{text:'그만하기',fn:quit,secondary:true}]);return}showLevelClear();return}}}else if(it.y>h+45){it.el.remove();items.splice(i,1)}}raf=requestAnimationFrame(t=>tick(t,id))}
+function showLevelClear(){select.replaceChildren();for(let n=1;n<=Math.min(MAX_LEVEL,level+1);n++){const opt=document.createElement('option');opt.value=n;opt.textContent=`레벨 ${n}`;if(n===level+1)opt.selected=true;select.appendChild(opt)}showModal('🎉 레벨 통과!',`사과 ${TARGET}개를 모았습니다!<br>다음 레벨로 가거나, 이미 도달한 레벨 중 하나를 선택하세요.`,[{text:`레벨 ${level+1} 진행`,fn:()=>begin(level+1)},{text:'선택한 레벨로',fn:()=>begin(Number(select.value)),secondary:true},{text:'그만하기',fn:quit,secondary:true}],true)}
+function setKey(key,on){if(key==='ArrowLeft')keys.left=on;if(key==='ArrowRight')keys.right=on}
+window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setKey(e.key,true)}});window.addEventListener('keyup',e=>setKey(e.key,false));window.addEventListener('blur',()=>{keys.left=keys.right=false});
+for(const [id,key] of [['leftButton','left'],['rightButton','right']]){const b=document.getElementById(id);b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys[key]=true});for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>keys[key]=false)}
+window.addEventListener('resize',positionPlayer);
+document.getElementById('startButton').onclick=restart;playerX=bounds().w/2;positionPlayer();updateHud();
+})();
+</script></body></html>
